@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from "../../firerbase"; // Ensure this path is correct for your project
+import { db } from "../firebase"; // Ensure this path is correct for your project
 import { 
   Archive, Calendar, Search, X, 
   AlertTriangle, Package, Info, User

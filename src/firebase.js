@@ -1,4 +1,4 @@
-// firerbase.js
+
 import { initializeApp } from "firebase/app";
 import { getFirestore, serverTimestamp, Timestamp } from "firebase/firestore";
 import { getStorage } from "firebase/storage";

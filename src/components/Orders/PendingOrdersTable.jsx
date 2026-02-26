@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 // 🟢 ADDED FiEye for the View Details button
 import { FiSearch, FiClock, FiRefreshCw, FiEye } from "react-icons/fi"; 
 import { collectionGroup, getDocs, query, where } from "firebase/firestore";
-import { db } from "../../../firerbase";
+import { db } from "../../firebase";
 
 /* ------------------------------------
     Helper Functions

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "../../../firerbase";
+import { db } from "../../firebase";
 import {
   TrashIcon,
   ClockIcon,

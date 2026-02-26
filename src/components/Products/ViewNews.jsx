@@ -41,7 +41,7 @@ import {
     setDoc
 } from "firebase/firestore";
 
-import { db } from "../../../firerbase";
+import { db } from "../../firebase";
 
 /* ---------------- DATE FORMATTERS ---------------- */
 const formatDate = (dateValue) => {

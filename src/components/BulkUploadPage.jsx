@@ -5,7 +5,7 @@ import {
   addDoc,
   serverTimestamp
 } from "firebase/firestore";
-import { db } from "../../firerbase";
+import { db } from "../firebase";
 import {
   Upload,
   FileSpreadsheet,

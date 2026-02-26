@@ -14,7 +14,7 @@ import {
 } from 'react-icons/fi';
 
 // Firebase imports
-import { db } from "../../../firerbase";
+import { db } from "../../firebase";
 import {
   collection,
   addDoc,

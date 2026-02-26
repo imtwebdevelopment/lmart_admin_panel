@@ -5,7 +5,7 @@ import {
   orderBy,
   query
 } from "firebase/firestore";
-import { db } from "../../../firerbase";
+import { db } from "../../firebase";
 import {
   FiTrash2,
   FiSearch,

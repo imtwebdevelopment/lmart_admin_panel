@@ -24,7 +24,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { FiMove } from "react-icons/fi";
 
 
-import { db, storage } from "../../../firerbase";
+import { db, storage } from "../../firebase";
 import {
   collection, doc, getDoc, updateDoc, serverTimestamp, getDocs,
 } from "firebase/firestore";

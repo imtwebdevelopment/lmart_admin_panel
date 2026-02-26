@@ -8,7 +8,7 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import { db } from '../../../firerbase';
+import { db } from '../../firebase';
 
 /* -----------------------------
    Helper utilities

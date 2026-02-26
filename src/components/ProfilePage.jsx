@@ -1,7 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { db } from "../../firerbase";
-import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../firebase";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { Camera, User, Mail, Save, ArrowLeft, Upload } from "lucide-react";
+
+// Add CSS as a string for the animation
+const fadeInAnimation = `
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-out;
+  }
+`;
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
@@ -12,7 +23,22 @@ export default function ProfilePage() {
   const [imagePreview, setImagePreview] = useState("");
   const [isUploading, setIsUploading] = useState(false);
 
+  // Add animation style to head
   useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = fadeInAnimation;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = () => {
     try {
       const stored = localStorage.getItem("adminUser");
       if (!stored || stored === "undefined" || stored === "null") return;
@@ -29,7 +55,19 @@ export default function ProfilePage() {
       console.error("Invalid JSON in adminUser:", err);
       setUser(null);
     }
-  }, []);
+  };
+
+  // Function to notify header about profile update
+  const notifyHeaderUpdate = (updatedUser) => {
+    // Dispatch custom event for header to listen
+    window.dispatchEvent(new CustomEvent('profileUpdated', { 
+      detail: updatedUser 
+    }));
+    
+    // Also trigger storage event for cross-tab sync
+    localStorage.setItem('adminUser', JSON.stringify(updatedUser));
+    window.dispatchEvent(new Event('storage'));
+  };
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -50,10 +88,23 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      setError("Please upload a valid image file (JPG, PNG, or GIF)");
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setError("File size must be less than 5MB");
+      return;
+    }
+
     setIsUploading(true);
+    setError("");
     
-    // In a real app, you would upload to Firebase Storage here
-    // For demo, we'll create a local URL and simulate upload
+    // Create local preview URL
     const reader = new FileReader();
     
     reader.onloadend = () => {
@@ -63,7 +114,18 @@ export default function ProfilePage() {
       setIsUploading(false);
       setSuccess("Image uploaded successfully!");
       
+      // Auto-update header with new image
+      if (user) {
+        const updatedUser = { ...user, photoURL: imageUrl };
+        notifyHeaderUpdate(updatedUser);
+      }
+      
       setTimeout(() => setSuccess(""), 3000);
+    };
+    
+    reader.onerror = () => {
+      setIsUploading(false);
+      setError("Error uploading image. Please try again.");
     };
     
     reader.readAsDataURL(file);
@@ -92,21 +154,35 @@ export default function ProfilePage() {
         updatedAt: new Date().toISOString(),
       };
 
+      // Update in Firebase
       await updateDoc(userRef, updatedData);
 
+      // Update local storage and state
       const newUser = { ...user, ...updatedData };
-      localStorage.setItem("adminUser", JSON.stringify(newUser));
+      
+      // Notify header about the update
+      notifyHeaderUpdate(newUser);
+      
       setUser(newUser);
-
       setSuccess("Profile updated successfully!");
       
-      // Reset success message after 5 seconds
       setTimeout(() => setSuccess(""), 5000);
     } catch (err) {
       console.error("Update error:", err);
       setError("Failed to update profile. Please check your connection or permissions.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleClearImage = () => {
+    setForm(prev => ({ ...prev, photoURL: "" }));
+    setImagePreview("/default-avatar.png");
+    
+    // Notify header about clear
+    if (user) {
+      const updatedUser = { ...user, photoURL: "" };
+      notifyHeaderUpdate(updatedUser);
     }
   };
 
@@ -155,11 +231,13 @@ export default function ProfilePage() {
           <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl shadow-sm animate-fadeIn">
             <div className="flex items-center">
               <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                <div className="w-5 h-5 bg-green-500 rounded-full"></div>
+                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
               </div>
               <div>
                 <p className="text-green-800 font-medium">{success}</p>
-                <p className="text-green-600 text-sm mt-1">Changes have been saved to Firebase</p>
+                <p className="text-green-600 text-sm mt-1">Changes have been saved and updated in header</p>
               </div>
             </div>
           </div>
@@ -169,7 +247,9 @@ export default function ProfilePage() {
           <div className="mb-6 p-4 bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-2xl shadow-sm animate-fadeIn">
             <div className="flex items-center">
               <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
-                <div className="w-5 h-5 bg-red-500 rounded-full"></div>
+                <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
               </div>
               <div>
                 <p className="text-red-800 font-medium">{error}</p>
@@ -213,7 +293,7 @@ export default function ProfilePage() {
                     <input
                       type="file"
                       className="hidden"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/gif,image/jpg"
                       onChange={handleImageUpload}
                     />
                   </label>
@@ -286,37 +366,21 @@ export default function ProfilePage() {
                           <input
                             type="file"
                             className="hidden"
-                            accept="image/*"
+                            accept="image/jpeg,image/png,image/gif,image/jpg"
                             onChange={handleImageUpload}
                           />
                         </label>
                       </div>
                     </div>
                     
-                    <div>
-                      {/* <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Image URL
-                      </label> */}
-                      <div className="flex space-x-3">
-                        {/* <input
-                          name="photoURL"
-                          type="text"
-                          value={form.photoURL}
-                          onChange={handleFormChange}
-                          className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                          placeholder="https://example.com/photo.jpg"
-                        /> */}
-                        <button
-                          type="button"
-                          onClick={() => setForm(prev => ({ ...prev, photoURL: "" }))}
-                          className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors duration-200"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                      <p className="text-sm text-gray-500 mt-2">
-                        Supports JPG, PNG, GIF up to 5MB. Or paste a direct image URL.
-                      </p>
+                    <div className="flex space-x-3">
+                      <button
+                        type="button"
+                        onClick={handleClearImage}
+                        className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors duration-200"
+                      >
+                        Clear
+                      </button>
                     </div>
                     
                     {isUploading && (
@@ -325,6 +389,10 @@ export default function ProfilePage() {
                         Uploading image...
                       </div>
                     )}
+                    
+                    <p className="text-sm text-gray-500 mt-4">
+                      Supports JPG, PNG, GIF up to 5MB. Image will automatically update in header.
+                    </p>
                   </div>
 
                   {/* Personal Information Section */}
@@ -368,41 +436,8 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Danger Zone */}
-                  <div className="border border-red-200 rounded-2xl p-6 bg-red-50">
-                    <h3 className="text-lg font-semibold text-red-800 mb-3">Danger Zone</h3>
-                    <p className="text-red-600 mb-4">Irreversible actions. Please proceed with caution.</p>
-                    <div className="flex space-x-4">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setForm({
-                            name: user.name || "",
-                            email: user.email || "",
-                            photoURL: user.photoURL || "",
-                          });
-                          setImagePreview(user.photoURL || "/default-avatar.png");
-                          setError("");
-                          setSuccess("");
-                        }}
-                        className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors duration-200"
-                      >
-                        Reset Changes
-                      </button>
-                      <button
-                        type="button"
-                        className="px-4 py-2 bg-red-100 text-red-700 border border-red-300 rounded-xl hover:bg-red-200 transition-colors duration-200"
-                      >
-                        Delete Account
-                      </button>
-                    </div>
-                  </div>
-
                   {/* Action Buttons */}
                   <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t border-gray-100">
-                    <div className="text-sm text-gray-500 mb-4 sm:mb-0">
-                      
-                    </div>
                     <div className="flex space-x-4">
                       <button
                         type="button"
@@ -436,23 +471,12 @@ export default function ProfilePage() {
 
             {/* Footer Note */}
             <div className="mt-6 text-center text-gray-500 text-sm">
-              <p>All changes are synchronized in real-time with Firebase Firestore.</p>
-              <p className="mt-1">Your data is encrypted and securely stored.</p>
+              <p>Profile picture updates instantly in the header across all tabs.</p>
+              <p className="mt-1">Your data is encrypted and securely stored in Firebase.</p>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Add some custom animation styles */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-      `}</style>
     </div>
   );
 }

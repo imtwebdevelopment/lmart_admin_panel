@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 // 🛑 IMPORTANT: Update the path to your Firebase config and include 'storage'
-import { db, storage } from '../../firerbase'; 
+import { db, storage } from '../firebase'; 
 import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';

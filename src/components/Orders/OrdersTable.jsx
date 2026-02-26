@@ -20,7 +20,7 @@ import {
     updateDoc,
     Timestamp
 } from 'firebase/firestore'; 
-import { db } from '../../../firerbase'; // Ensure this path is correct
+import { db } from '../../firebase'; // Ensure this path is correct
 
 // --- Helper Functions ---
 const formatAmount = (amount) => Number(amount || 0);

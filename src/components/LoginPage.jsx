@@ -1,129 +1,185 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiBarChart2, FiLock, FiMail } from 'react-icons/fi';
+import { FiBarChart2, FiLock, FiMail, FiLogIn, FiEye, FiEyeOff } from 'react-icons/fi';
+import { auth, db } from "../firebase";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
-import { db } from "../../firerbase";
-import { collection, query, where, getDocs } from "firebase/firestore";
-
-const PRIMARY_RED = "bg-gradient-to-r from-red-600 to-red-700";
-const HOVER_RED = "hover:from-red-700 hover:to-red-800";
-const LOGIN_BUTTON_CLASS = `${PRIMARY_RED} ${HOVER_RED} w-full p-3 rounded-lg text-white font-bold flex items-center justify-center transition-all duration-300 shadow-lg mt-4`;
+const ADMIN_UID = "ZpokHqjdcXghrgJ4HvWPnGidb962";
 
 export default function LoginPage({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    setLoading(true);
     setError("");
 
     try {
-      const q = query(
-        collection(db, "admin"),
-        where("email", "==", email),
-        where("password", "==", password)
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
       );
 
-      const result = await getDocs(q);
+      const user = userCredential.user;
 
-      if (!result.empty) {
-        const docSnap = result.docs[0];
-        const admin = docSnap.data();
-
-        // Construct clean admin object
-        const adminData = {
-          uid: docSnap.id,
-          name: admin.name,
-          email: admin.email,
-          password: admin.password,
-          photoURL: admin.photoURL || null
-        };
-
-        // Save safely
-        localStorage.setItem("adminUser", JSON.stringify(adminData));
-
-        // Pass full data to App.js
-        onLogin(adminData);
-
-        navigate("/", { replace: true });
-      } else {
-        setError("Invalid email or password");
+      if (user.uid !== ADMIN_UID) {
+        await signOut(auth);
+        setError("You are not authorized");
+        setLoading(false);
+        return;
       }
 
+      const adminRef = doc(db, "admin", user.uid);
+      const adminSnap = await getDoc(adminRef);
+
+      let adminData = {};
+
+      if (!adminSnap.exists()) {
+        // First time login - create new admin document
+        const newAdmin = {
+          uid: user.uid,
+          email: user.email,
+          name: user.displayName || "Admin User",
+          photoURL: user.photoURL || "",
+          role: "admin",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+        
+        await setDoc(adminRef, newAdmin);
+        adminData = newAdmin;
+      } else {
+        // Existing user - get their data including photoURL
+        adminData = {
+          uid: user.uid,
+          email: adminSnap.data().email || user.email,
+          name: adminSnap.data().name || "Admin User",
+          photoURL: adminSnap.data().photoURL || "",
+          role: adminSnap.data().role || "admin",
+          createdAt: adminSnap.data().createdAt,
+          updatedAt: adminSnap.data().updatedAt
+        };
+      }
+
+      // Save to localStorage
+      localStorage.setItem("adminUser", JSON.stringify(adminData));
+
+      // Notify header about login
+      window.dispatchEvent(new CustomEvent('profileUpdated', { 
+        detail: adminData 
+      }));
+
+      if (onLogin) {
+        onLogin(adminData);
+      }
+
+      navigate("/", { replace: true });
+
     } catch (err) {
-      console.error("Login error:", err);
-      setError("Login failed");
+      console.error(err);
+      setError("Invalid email or password");
     }
 
-    setIsLoading(false);
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-8 border border-gray-200">
-        
-        <div className="text-center mb-8">
-          <div className="inline-block p-4 rounded-full bg-red-600/10 border border-red-200 shadow-md">
-            <FiBarChart2 className="w-8 h-8 text-red-600" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 p-4">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-8 text-center">
+          <div className="inline-flex p-4 bg-white/20 backdrop-blur rounded-2xl mb-4 shadow-md">
+            <FiBarChart2 className="text-white text-4xl" />
           </div>
-          <h1 className="text-2xl font-extrabold text-gray-900 mt-4">
-            Admin Dashboard Login
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Sign in to manage your inventory and orders
-          </p>
+          <h2 className="text-3xl font-bold text-white mb-1">Welcome Back</h2>
+          <p className="text-white/90 text-sm">Admin Dashboard Access</p>
         </div>
 
+        {/* Error */}
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 text-sm">
+          <div className="mx-6 mt-4 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-r-lg text-sm shadow-sm">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleLogin}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address
-            </label>
-            <div className="relative">
-              <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="admin@imart.in"
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg"
-              />
+        {/* Form */}
+        <div className="p-8 pt-6">
+          <form onSubmit={handleLogin} className="space-y-5">
+            {/* Email */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Email Address
+              </label>
+              <div className="relative">
+                <FiMail className="absolute left-3 top-3 text-gray-400" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-10 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-200 text-gray-700 transition"
+                  placeholder="admin@example.com"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <div className="relative">
-              <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg"
-              />
+            {/* Password */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <div className="relative">
+                <FiLock className="absolute left-3 top-3 text-gray-400" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-200 text-gray-700 transition"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-purple-600 transition"
+                >
+                  {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                </button>
+              </div>
             </div>
-          </div>
 
-          <button type="submit" className={LOGIN_BUTTON_CLASS} disabled={isLoading}>
-            {isLoading ? "Loading..." : "Login"}
-          </button>
-        </form>
-
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-3 rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-70"
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10"
+                      stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                    <path className="opacity-75" fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8H4z"></path>
+                  </svg>
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  <FiLogIn />
+                  Login to Dashboard
+                </>
+              )}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

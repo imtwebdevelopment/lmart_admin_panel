@@ -23,7 +23,7 @@ import {
 import { FiMove } from "react-icons/fi";
 
 // Assuming you have imported and configured your Firebase app instance:
-import { db, storage } from "../../../firerbase";
+import { db, storage } from "../../firebase";
 import {
   collection,
   addDoc,

@@ -5,7 +5,7 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy 
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // Assuming you have your firebase config exported from this path
-import { db, storage } from "../../firerbase"; 
+import { db, storage } from "../firebase"; 
 
 // Enhanced image compression utility
 const compressImage = (file, maxWidth = 1200, quality = 0.7) => {

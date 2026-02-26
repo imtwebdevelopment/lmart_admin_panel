@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { db } from "../../../firerbase";
+import { db } from "../../firebase";
 import { Users, Trash2, Calendar } from "lucide-react";
 
 const DeletedCustomers = () => {

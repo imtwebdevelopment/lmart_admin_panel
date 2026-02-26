@@ -20,7 +20,7 @@ import {
   FiShoppingBag,
   FiRefreshCw,
 } from "react-icons/fi";
-import { db } from "../../../firerbase";
+import { db } from "../../firebase";
 
 const ManageSubcategories = () => {
   // --- REF FOR SCROLLING ---

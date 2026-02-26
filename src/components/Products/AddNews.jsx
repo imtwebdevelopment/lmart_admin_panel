@@ -27,7 +27,7 @@ import {
     uploadBytes,
     getDownloadURL
 } from "firebase/storage";
-import { db, storage } from "../../../firerbase"; 
+import { db, storage } from "../../firebase"; 
 
 const AddNewsToday = () => {
     const navigate = useNavigate();

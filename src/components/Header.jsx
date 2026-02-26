@@ -2,14 +2,81 @@ import React, { useState, useEffect } from "react";
 import { FiChevronDown, FiMenu, FiBarChart2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
-export default function Header({ onToggleSidebar, onLogout, user }) {
+export default function Header({ onToggleSidebar, onLogout, user, onUserUpdate }) {
   const navigate = useNavigate();
   const [admin, setAdmin] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [profileImage, setProfileImage] = useState("/default-avatar.png");
 
+  // Load user data on mount and when user prop changes
   useEffect(() => {
-    setAdmin(user || null);
+    loadUserData();
   }, [user]);
+
+  const loadUserData = () => {
+    try {
+      // First try to get from props
+      if (user) {
+        setAdmin(user);
+        setProfileImage(user.photoURL || "/default-avatar.png");
+        return;
+      }
+
+      // Then try from localStorage
+      const stored = localStorage.getItem("adminUser");
+      if (stored && stored !== "undefined" && stored !== "null") {
+        const parsed = JSON.parse(stored);
+        setAdmin(parsed);
+        setProfileImage(parsed.photoURL || "/default-avatar.png");
+      }
+    } catch (err) {
+      console.error("Error loading user data:", err);
+      setProfileImage("/default-avatar.png");
+    }
+  };
+
+  // Listen for profile updates
+  useEffect(() => {
+    const handleStorageChange = () => {
+      loadUserData();
+    };
+
+    const handleProfileUpdate = (event) => {
+      if (event.detail) {
+        setAdmin(event.detail);
+        setProfileImage(event.detail.photoURL || "/default-avatar.png");
+        
+        // Update localStorage if needed
+        localStorage.setItem("adminUser", JSON.stringify(event.detail));
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("profileUpdated", handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("profileUpdated", handleProfileUpdate);
+    };
+  }, []);
+
+  const handleImageError = (e) => {
+    e.target.src = "/default-avatar.png";
+    setProfileImage("/default-avatar.png");
+  };
+
+  const handleLogout = () => {
+    // Clear localStorage
+    localStorage.removeItem("adminUser");
+    
+    // Call parent logout
+    if (onLogout) {
+      onLogout();
+    }
+    
+    // Navigate to login
+    navigate("/login");
+  };
 
   return (
     <header className="bg-white shadow-sm border-b sticky top-0 z-10">
@@ -37,13 +104,15 @@ export default function Header({ onToggleSidebar, onLogout, user }) {
             className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100"
           >
             <img
-              src={admin?.photoURL || "/default-avatar.png"}
-              className="w-8 h-8 rounded-full object-cover"
+              src={profileImage}
+              alt={admin?.name || "Profile"}
+              className="w-8 h-8 rounded-full object-cover border-2 border-blue-100"
+              onError={handleImageError}
             />
 
             <div className="hidden sm:block text-left">
-              <p className="text-sm font-semibold">{admin?.name}</p>
-              <p className="text-xs text-gray-500">{admin?.email}</p>
+              <p className="text-sm font-semibold">{admin?.name || "User"}</p>
+              <p className="text-xs text-gray-500">{admin?.email || ""}</p>
             </div>
 
             <FiChevronDown
@@ -61,18 +130,21 @@ export default function Header({ onToggleSidebar, onLogout, user }) {
                   navigate("/profile");
                   setIsOpen(false);
                 }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-100"
+                className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center"
               >
+                <img 
+                  src={profileImage} 
+                  alt="Profile" 
+                  className="w-5 h-5 rounded-full mr-2 object-cover"
+                  onError={handleImageError}
+                />
                 Profile
               </button>
 
               <div className="border-t my-1"></div>
 
               <button
-                onClick={() => {
-                  onLogout();
-                  navigate("/login");
-                }}
+                onClick={handleLogout}
                 className="w-full px-4 py-2 text-left text-red-600 hover:bg-gray-100"
               >
                 Logout

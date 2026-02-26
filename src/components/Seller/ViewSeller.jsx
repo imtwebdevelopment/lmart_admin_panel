@@ -3,7 +3,7 @@ import {
   collection, getDocs, doc, updateDoc, 
   query, where, deleteDoc, writeBatch, addDoc
 } from 'firebase/firestore';
-import {db} from "../../../firerbase"
+import {db} from "../../firebase"
 import { 
   Users, Mail, Phone, MapPin, Calendar, X, Search, 
   FileText, CheckCircle, Clock, Package, DollarSign, ExternalLink, ShieldCheck,

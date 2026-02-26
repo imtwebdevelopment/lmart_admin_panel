@@ -35,7 +35,7 @@ import {
     CheckCircleIcon // 🚨 ADDED: Icon for the success modal
 } from '@heroicons/react/20/solid';
 
-import { db } from "../../../firerbase";
+import { db } from "../../firebase";
 
 // ==========================================================
 // UTILITY FUNCTIONS (Unchanged)

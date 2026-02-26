@@ -1,7 +1,7 @@
 // DeletedSellersTable.jsx - Complete Component
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, query, orderBy } from 'firebase/firestore';
-import { db } from "../../../firerbase";
+import { db } from "../../firebase";
 import { 
   Users, Trash2, Archive, Clock, Calendar, Mail, Phone, 
   MapPin, ChevronLeft, Search, X, AlertTriangle, User,

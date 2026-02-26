@@ -54,7 +54,7 @@ import AddNewsToday from "./components/Products/AddNews.jsx";
 // Login
 import LoginPage from "./components/LoginPage.jsx";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
-import { auth } from "../firerbase";
+import { auth } from "./firebase.js";
 
 onAuthStateChanged(auth, (user) => {
   if (user) {

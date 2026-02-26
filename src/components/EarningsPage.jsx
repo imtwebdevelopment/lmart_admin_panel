@@ -6,7 +6,7 @@ import {
   query
 } from "firebase/firestore";
 
-import { db } from "../../firerbase";
+import { db } from "../firebase";
 
 import {
   FiDollarSign,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {db} from  "../firerbase"
+import {db} from  "./firebase"
 import { collection, getDocs, updateDoc, doc, query, orderBy } from "firebase/firestore";
 import {
   FiStar,

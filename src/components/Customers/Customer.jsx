@@ -19,7 +19,7 @@ import {
 
 
 // --- Firebase/Firestore Imports ---
-import { db } from "../../../firerbase"; 
+import { db } from "../../firebase"; 
 import { 
   collection, 
   onSnapshot,

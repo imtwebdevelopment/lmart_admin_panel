@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { db, storage } from "../../firerbase";
+import { db, storage } from "../firebase";
 import {
   collection,
   getDocs,

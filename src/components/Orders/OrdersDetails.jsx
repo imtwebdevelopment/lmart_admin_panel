@@ -20,7 +20,7 @@ import {
 // Firebase
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 // 🛑 Note: Adjust the path to your firebase config if needed
-import { db, Timestamp } from "../../../firerbase"; 
+import { db, Timestamp } from "../../firebase"; 
 
 // jsPDF (vector-based PDF)
 import { jsPDF } from "jspdf";

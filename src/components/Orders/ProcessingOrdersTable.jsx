@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FiSearch, FiCheckSquare, FiEye, FiDownload, FiRefreshCw } from 'react-icons/fi';
 import { collectionGroup, getDocs, query, where } from 'firebase/firestore'; 
-import { db } from '../../../firerbase'; 
+import { db } from '../../firebase'; 
 
 // ---------------- Helper Functions ----------------
 const formatAmount = (amount) => `₹${Number(amount || 0).toLocaleString('en-IN')}`;

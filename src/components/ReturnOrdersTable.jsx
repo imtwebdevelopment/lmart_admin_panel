@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiSearch, FiArchive, FiClock, FiFileText } from 'react-icons/fi';
 import { collectionGroup, getDocs, query } from 'firebase/firestore';
-import { db } from "../../firerbase";
+import { db } from "../firebase";
 
 /* ------------------------------------
     Helper Functions
