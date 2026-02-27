@@ -18,7 +18,7 @@ import {
 } from "react-icons/fi";
 
 // Firebase
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 // 🛑 Note: Adjust the path to your firebase config if needed
 import { db, Timestamp } from "../../firebase"; 
 
@@ -151,9 +151,7 @@ const loadImageAsBase64 = (path) =>
         })
     );
 
-// ======================================================================
-// --- 2. OrderDetail Component (Main View) ---
-// ======================================================================
+
 
 const OrderDetail = () => {
   const { userId, orderId } = useParams();
@@ -170,9 +168,12 @@ const ORDER_STATUSES = [
   "Shipped",
   "Delivered",
   "Cancelled",
+  "Refund_Completed"
 ];
 const isFinalStatus =
-  order?.status === "Delivered" || order?.status === "Cancelled";
+  order?.status === "Delivered" ||
+  order?.status === "Cancelled" ||
+  order?.status === "Refund_Completed";
 
 
   const isLegacyOrder = userId === "unknown_user" || !userId; 
@@ -185,7 +186,7 @@ const isFinalStatus =
 
   // ---------------------------------------------------------
   // UPDATE ORDER STATUS
-  // ---------------------------------------------------------
+  // ---------------------------------------------------------  
 const updateOrderStatus = async (newStatus) => {
   if (isLegacyOrder || !orderId || !order || newStatus === order.status) {
     if (isLegacyOrder)
@@ -198,22 +199,47 @@ const updateOrderStatus = async (newStatus) => {
 
   setIsUpdatingStatus(true);
 
-  try {
-    const newTimestamp = Timestamp.fromDate(new Date());
+ try {
+  const newTimestamp = Timestamp.fromDate(new Date());
 
-    setOrder((prev) =>
-      prev ? { ...prev, status: newStatus, updatedAt: newTimestamp } : null
-    );
+  setOrder((prev) =>
+    prev ? { ...prev, status: newStatus, updatedAt: newTimestamp } : null
+  );
 
-    const orderRef = isLegacyOrder
-      ? doc(db, "orders", orderId)
-      : doc(db, "users", userId, "orders", orderId);
+  const orderRef = isLegacyOrder
+    ? doc(db, "orders", orderId)
+    : doc(db, "users", userId, "orders", orderId);
 
-    await updateDoc(orderRef, {
-      status: newStatus,
-      updatedAt: newTimestamp,
-    });
-  } catch (err) {
+  await updateDoc(orderRef, {
+    status: newStatus,
+    updatedAt: newTimestamp,
+  });
+
+  // ✅ If refund completed, also update returnRequests
+if (newStatus === "Refund_Completed") {
+
+  const returnQuery = query(
+  collection(db, "users", userId, "returnRequests"),
+  where("firestoreOrderId", "==", orderId)
+);
+
+  const snapshot = await getDocs(returnQuery);
+
+  console.log("Snapshot size:", snapshot.size);
+
+  if (snapshot.empty) {
+    console.warn("No matching return request found.");
+  } else {
+    for (const docSnap of snapshot.docs) {
+      await updateDoc(docSnap.ref, {
+        status: "completed",
+        refundCompletedAt: newTimestamp
+      });
+    }
+  }
+}
+
+} catch (err) {
     console.error("Update Status Error:", err);
     alert(`Failed to update status: ${err.message}`);
 
@@ -623,15 +649,17 @@ return (
   onChange={(e) => updateOrderStatus(e.target.value)}
   disabled={isUpdatingStatus || isLegacyOrder || isFinalStatus}
   className={`px-4 py-2 text-sm font-semibold rounded-lg border shadow-sm transition-colors
-    ${
-      order.status === "Delivered"
-        ? "bg-green-100 border-green-300 text-green-700"
-        : order.status === "Cancelled"
-        ? "bg-red-100 border-red-300 text-red-700"
-        : order.status === "Shipped"
-        ? "bg-blue-100 border-blue-300 text-blue-700"
-        : "bg-yellow-100 border-yellow-300 text-yellow-700"
-    }
+${
+  order.status === "Delivered"
+    ? "bg-green-100 border-green-300 text-green-700"
+    : order.status === "Cancelled"
+    ? "bg-red-100 border-red-300 text-red-700"
+    : order.status === "Shipped"
+    ? "bg-blue-100 border-blue-300 text-blue-700"
+    : order.status === "Refund_Completed"
+    ? "bg-purple-100 border-purple-300 text-purple-700"
+    : "bg-yellow-100 border-yellow-300 text-yellow-700"
+}
     ${
       isUpdatingStatus || isLegacyOrder || isFinalStatus
         ? "opacity-50 cursor-not-allowed"
