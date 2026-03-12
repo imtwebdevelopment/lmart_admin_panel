@@ -21,6 +21,7 @@ import PendingOrdersTable from "./components/Orders/PendingOrdersTable.jsx";
 import { ProcessingOrdersTable } from "./components/Orders/ProcessingOrdersTable.jsx";
 import { ShippedOrdersTable } from "./components/Orders/ShippedOrdersTable.jsx";
 import { DeliveredOrdersTable } from "./components/Orders/DeliveredOrdersTable.jsx";
+import CompletedOrdersTable from "./components/Orders/CompletedOrdersTable.jsx";
 import { CancelledOrdersTable } from "./components/Orders/CancelledOrdersTable.jsx";
 import ReturnOrdersTable from "./components/ReturnOrdersTable.jsx";
 import RecentOrdersTable from "./components/RecentOrdersTable.jsx";
@@ -185,11 +186,12 @@ export default function App() {
                     {/* Orders */}
                     <Route path="orders" element={<Navigate to="all" replace />} />
                     <Route path="orders/all" element={<OrdersTable />} />
-                    <Route path="orders/:userId/:orderId" element={<OrderDetail />} />
+                    <Route path="/orders/:userId/:orderId" element={<OrderDetail />} />
                     <Route path="orders/pending" element={<PendingOrdersTable />} />
                     <Route path="orders/processing" element={<ProcessingOrdersTable />} />
                     <Route path="orders/shipped" element={<ShippedOrdersTable />} />
                     <Route path="orders/delivered" element={<DeliveredOrdersTable />} />
+                    <Route path="orders/completed" element={<CompletedOrdersTable />} />
                     <Route path="orders/cancelled" element={<CancelledOrdersTable />} />
                     <Route path="return-orders" element={<ReturnOrdersTable />} />
                     <Route path="recent-orders" element={<RecentOrdersTable />} />

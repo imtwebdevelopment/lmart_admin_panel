@@ -138,6 +138,7 @@ export default function Sidebar({ onCloseSidebar, onLogout }) {
         { text: "Processing", path: "/orders/processing" },
         { text: "Shipped", path: "/orders/shipped" },
         { text: "Delivered", path: "/orders/delivered" },
+        { text: "Completed", path: "/orders/completed" },
         { text: "Cancelled", path: "/orders/cancelled" }
       ]
     },
