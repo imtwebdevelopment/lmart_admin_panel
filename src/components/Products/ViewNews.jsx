@@ -42,6 +42,7 @@ import {
 } from "firebase/firestore";
 
 import { db } from "../../firebase";
+import { resolveImageUrl } from "../../utils/imageUtils";
 
 /* ---------------- DATE FORMATTERS ---------------- */
 const formatDate = (dateValue) => {
@@ -196,7 +197,7 @@ const ViewDetailsModal = ({ isOpen, onClose, newsItem }) => {
                                         </h4>
                                         <div className="rounded-2xl overflow-hidden border-2 border-gray-100 shadow-xl group hover:shadow-2xl transition-all duration-300">
                                             <img
-                                                src={newsItem.mainImageUrl}
+                                                src={resolveImageUrl(newsItem.mainImageUrl)}
                                                 alt="news"
                                                 className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-500"
                                             />
@@ -242,7 +243,7 @@ const ViewDetailsModal = ({ isOpen, onClose, newsItem }) => {
                     </span>
 
                     <img
-                        src={img}
+                        src={resolveImageUrl(img)}
                         alt={`gallery-${index}`}
                         className="w-full h-32 object-cover group-hover:scale-110 transition-transform duration-500"
                     />
@@ -329,7 +330,7 @@ const NewsCard = ({ news, onView, onDelete }) => {
                 {news.mainImageUrl ? (
                     <>
                         <img 
-                            src={news.mainImageUrl} 
+                            src={resolveImageUrl(news.mainImageUrl)}
                             alt={news.title}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         />

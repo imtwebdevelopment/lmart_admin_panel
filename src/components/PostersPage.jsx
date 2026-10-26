@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { FiImage, FiUploadCloud, FiXCircle, FiEdit, FiSave, FiTrash2, FiPlus, FiRefreshCw } from "react-icons/fi";
 
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { collection, updateDoc, deleteDoc, doc, getDocs, query, orderBy, setDoc } from "firebase/firestore";
 
-import { db, storage } from "../firebase"; 
-import { uploadImageToMongoDB, deleteImageFromMongoDB } from "../services/imageService";
+import { db } from "../firebase";
+import { uploadImageToMongoDB, deleteImageFromMongoDB, getMongoImageId } from "../services/imageService";
 import { resolveImageUrl, handleImageError, FALLBACK_IMAGE } from "../utils/imageUtils"; 
 
 // Enhanced image compression utility
@@ -216,18 +215,12 @@ export default function PostersPage() {
         fileToUpload = await compressImage(selectedFile);
       }
       
-      let imageURL = '';
-      try {
-        const uploadResult = await uploadImageToMongoDB(fileToUpload, {
-          role: 'banner',
-        });
-        imageURL = uploadResult.imageUrl || uploadResult.url;
-      } catch (mongoErr) {
-        console.warn("MongoDB upload failed, attempting Firebase Storage fallback:", mongoErr);
-        const imageRef = ref(storage, `posters/${Date.now()}-${fileToUpload.name}`);
-        await uploadBytes(imageRef, fileToUpload);
-        imageURL = await getDownloadURL(imageRef);
-      }
+      const posterRef = doc(collection(db, "posters"));
+      const uploadResult = await uploadImageToMongoDB(fileToUpload, {
+        associatedRecordId: posterRef.id,
+        role: 'poster',
+      });
+      const imageURL = uploadResult.url;
 
       // Save in Firestore
       const posterData = {
@@ -245,22 +238,17 @@ export default function PostersPage() {
         createdAt: new Date()
       };
 
-      const docRef = await addDoc(collection(db, "posters"), posterData);
-
-      // Save ID also in Firestore document itself
-      await updateDoc(doc(db, "posters", docRef.id), {
-        posterId: docRef.id
-      });
+      await setDoc(posterRef, { ...posterData, posterId: posterRef.id });
 
       // Add to local state with loading state
       const newPoster = { 
         ...posterData, 
-        posterId: docRef.id, 
-        id: docRef.id 
+        posterId: posterRef.id,
+        id: posterRef.id
       };
       
       setPosters([newPoster, ...posters]);
-      setLoadingImages(prev => ({ ...prev, [docRef.id]: true }));
+      setLoadingImages(prev => ({ ...prev, [posterRef.id]: true }));
 
       // Reset form
       setPosterTitle("");
@@ -283,21 +271,9 @@ export default function PostersPage() {
 
     try {
       const posterToDelete = posters.find(p => p.id === id);
-      if (posterToDelete?.imageUrl) {
-        const raw = posterToDelete.imageUrl;
-        let imageId = null;
-        if (raw.startsWith('mongodb://')) {
-          imageId = raw.replace('mongodb://', '');
-        } else {
-          const match = raw.match(/\/api\/images\/([0-9a-fA-F]{24})/);
-          if (match) imageId = match[1];
-        }
-        if (imageId) {
-          await deleteImageFromMongoDB(imageId).catch(e => console.warn("Failed to delete MongoDB image:", e));
-        }
-      }
-
       await deleteDoc(doc(db, "posters", id));
+      const imageId = getMongoImageId(posterToDelete?.imageUrl);
+      if (imageId) await deleteImageFromMongoDB(imageId);
       setPosters(posters.filter(p => p.id !== id));
       
       // Remove from loading states

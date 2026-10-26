@@ -14,6 +14,7 @@ import {
   FiShoppingBag,
   FiAlertCircle,
 } from "react-icons/fi";
+import { resolveImageUrl } from "./utils/imageUtils";
 
 /* ---------- Helpers ---------- */
 
@@ -379,7 +380,7 @@ export default function TrendingProducts() {
                       <div className="relative h-48 overflow-hidden">
                         {p.mainImageUrl ? (
                           <img
-                            src={p.mainImageUrl}
+                            src={resolveImageUrl(p.mainImageUrl)}
                             alt={p.name}
                             className="w-full h-full object-contain transition-transform duration-500 hover:scale-110"
                             onError={(e) => {
@@ -469,7 +470,7 @@ export default function TrendingProducts() {
                             <div className="w-24 h-24 rounded-xl overflow-hidden">
                               {p.mainImageUrl ? (
                                 <img
-                                  src={p.mainImageUrl}
+                                  src={resolveImageUrl(p.mainImageUrl)}
                                   alt={p.name}
                                   className="w-full h-full object-contain"
                                   onError={(e) => {

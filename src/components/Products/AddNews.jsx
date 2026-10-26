@@ -28,6 +28,7 @@ import {
     getDownloadURL
 } from "firebase/storage";
 import { db, storage } from "../../firebase"; 
+import { uploadImageToMongoDB } from "../../services/imageService";
 
 const AddNewsToday = () => {
     const navigate = useNavigate();
@@ -230,16 +231,17 @@ const handleReplaceVideo = (e) => {
         setSaveMessage('');
 
         try {
-        
+            const docRef = doc(collection(db, "news"));
             let mainImageUrl = null;
 let mainImagePath = null;
 
 if (formData.mainImage) {
-    mainImagePath = `news/main/${Date.now()}_${formData.mainImage.name}`;
-    const imageRef = ref(storage, mainImagePath);
-
-    await uploadBytes(imageRef, formData.mainImage);
-    mainImageUrl = await getDownloadURL(imageRef);
+    const uploaded = await uploadImageToMongoDB(formData.mainImage, {
+        associatedRecordId: docRef.id,
+        role: 'news-main',
+    });
+    mainImagePath = uploaded.path;
+    mainImageUrl = uploaded.url;
 }
 
             let videoUrl = null, videoPath = null;
@@ -249,14 +251,12 @@ let galleryPaths = [];
 
 if (formData.images.length > 0) {
     for (const image of formData.images) {
-        const path = `news/gallery/${Date.now()}_${image.name}`;
-        const imageRef = ref(storage, path);
-
-        await uploadBytes(imageRef, image);
-        const url = await getDownloadURL(imageRef);
-
-        galleryUrls.push(url);
-        galleryPaths.push(path);
+        const uploaded = await uploadImageToMongoDB(image, {
+            associatedRecordId: docRef.id,
+            role: 'news-gallery',
+        });
+        galleryUrls.push(uploaded.url);
+        galleryPaths.push(uploaded.path);
     }
 }
 
@@ -269,7 +269,6 @@ if (formData.images.length > 0) {
                 videoUrl = await getDownloadURL(videoRef);
             }
 
-            const docRef = doc(collection(db, "news"));
 await setDoc(docRef, {
     id: docRef.id,
     title: formData.title.trim(),

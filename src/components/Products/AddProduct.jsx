@@ -26,9 +26,9 @@ import { FiMove } from "react-icons/fi";
 import { db, storage } from "../../firebase";
 import {
   collection,
-  addDoc,
-  getDocs,
   doc,
+  setDoc,
+  getDocs,
   updateDoc,
   serverTimestamp,
 
@@ -548,11 +548,13 @@ const AddProductPage = () => {
       let imageUrls = [];
       let mainDownloadURL = '';
       let videoDownloadURL = '';
+      const productDocRef = doc(collection(db, "products"));
 
       // A. Main Image Upload (MongoDB Image Storage)
       if (mainImageFile) {
         const mainFile = mainImageFile.file;
         const uploadedMain = await uploadImageToMongoDB(mainFile, {
+          associatedRecordId: productDocRef.id,
           isMain: true,
           color: '',
           role: 'product',
@@ -573,6 +575,7 @@ const AddProductPage = () => {
       for (const imageObject of galleryFiles) {
         const galleryFile = imageObject.file;
         const uploadedGallery = await uploadImageToMongoDB(galleryFile, {
+          associatedRecordId: productDocRef.id,
           isMain: false,
           color: imageObject.color || '',
           role: 'product',
@@ -661,10 +664,10 @@ const AddProductPage = () => {
 
 
       // --- 5. SAVE TO FIRESTORE ---
-      const docRef = await addDoc(collection(db, "products"), productToSave);
+      await setDoc(productDocRef, productToSave);
 
       // --- 6. CLEANUP AND SUCCESS ---
-      setNewlyAddedProductId(docRef.id);
+      setNewlyAddedProductId(productDocRef.id);
       setShowSuccessModal(true); // <--- OPEN MODAL ON SUCCESS
 
     } catch (error) {

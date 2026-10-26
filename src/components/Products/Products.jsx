@@ -37,7 +37,7 @@ import {
 
 import { db } from "../../firebase";
 
-import { getAdminProductImage, handleImageError } from "../../utils/imageUtils";
+import { FALLBACK_IMAGE, getAdminProductImage, handleImageError, resolveImageUrl } from "../../utils/imageUtils";
 
 // ==========================================================
 // UTILITY FUNCTIONS (Unchanged)
@@ -1003,7 +1003,7 @@ const IntegratedProductView = ({ productId, onClose, navigate, onDelete }) => {
     return (
       <img
         key={i}
-        src={imageUrl}
+        src={resolveImageUrl(imageUrl)}
         alt={`Gallery ${i + 1}`}
         className="w-16 h-16 object-cover rounded-lg cursor-pointer border-2 border-transparent hover:border-indigo-500 transition"
       />

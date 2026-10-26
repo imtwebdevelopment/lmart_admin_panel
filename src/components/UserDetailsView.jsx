@@ -1,11 +1,10 @@
-// UserDetailsView.jsx
-
 import React, { useState, useEffect, useRef } from 'react';
-// 🛑 IMPORTANT: Update the path to your Firebase config and include 'storage'
-import { db, storage } from '../firebase'; 
+import { db, storage } from '../firebase';
 import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
+import { uploadImageToMongoDB, isImageFile } from '../services/imageService';
+import { resolveImageUrl } from '../utils/imageUtils';
 import { 
     FiLoader, FiAlertTriangle, FiFileText, FiDownload, FiUser, FiArrowLeft, 
     FiUploadCloud, FiRefreshCw 
@@ -94,7 +93,7 @@ export default function UserDetailsView({ userIdToView, onBack }) {
     
     const handleDownload = (url) => {
         if (url) {
-            window.open(url, '_blank');
+            window.open(resolveImageUrl(url), '_blank');
         } else {
             alert('Download URL not available.');
         }
@@ -112,21 +111,37 @@ export default function UserDetailsView({ userIdToView, onBack }) {
         setUploadMessage(null);
         const uniqueFileId = uuidv4();
         // Storage path: uploadfile/{userId}/{fileName}_{uuid}
-        const storageRef = ref(storage, `uploadfile/${userIdToView}/${file.name}_${uniqueFileId}`);
-
         try {
-            const snapshot = await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(snapshot.ref);
+            let downloadURL;
+            let storagePath;
+            let imageId = '';
+            let fileType = file.type;
+            if (isImageFile(file)) {
+                const uploaded = await uploadImageToMongoDB(file, {
+                    associatedRecordId: userIdToView,
+                    role: 'customer-file',
+                });
+                downloadURL = uploaded.url;
+                storagePath = uploaded.path;
+                imageId = uploaded.id;
+                fileType = uploaded.contentType;
+            } else {
+                const storageRef = ref(storage, `uploadfile/${userIdToView}/${file.name}_${uniqueFileId}`);
+                const snapshot = await uploadBytes(storageRef, file);
+                downloadURL = await getDownloadURL(snapshot.ref);
+                storagePath = snapshot.ref.fullPath;
+            }
 
             const fileMetadata = {
                 fileId: uniqueFileId,
                 originalName: file.name,
-                fileType: file.type,
+                fileType,
                 fileSize: file.size,
                 downloads: 0,
                 uploadedAt: new Date(),
-                storagePath: snapshot.ref.fullPath,
+                storagePath,
                 downloadURL: downloadURL,
+                imageId,
             };
 
             const docRef = doc(db, 'uploadfile', userIdToView);

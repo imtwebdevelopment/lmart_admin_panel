@@ -31,7 +31,7 @@ import {
 import {
   ref, uploadBytes, getDownloadURL, deleteObject
 } from "firebase/storage";
-import { uploadImageToMongoDB, deleteImageFromMongoDB } from "../../services/imageService";
+import { uploadImageToMongoDB, deleteImageFromMongoDB, getMongoImageId } from "../../services/imageService";
 import { resolveImageUrl, handleImageError } from "../../utils/imageUtils";
 
 // Reusable functions
@@ -781,34 +781,12 @@ if (
 
   // Delete Files from Storage
   const deleteFilesFromStorage = async () => {
-    try {
-      const deleteImagePromises = imagesToDelete.map(async (path) => {
-        if (path && path.trim() !== '') {
-          let imageId = null;
-          if (path.startsWith('mongodb://')) {
-            imageId = path.replace('mongodb://', '');
-          } else {
-            const match = path.match(/\/api\/images\/([0-9a-fA-F]{24})/);
-            if (match) imageId = match[1];
-          }
+    const imageIds = imagesToDelete.map(getMongoImageId).filter(Boolean);
+    await Promise.all(imageIds.map(deleteImageFromMongoDB));
 
-          if (imageId) {
-            await deleteImageFromMongoDB(imageId).catch(err => console.warn("Error deleting MongoDB image:", err));
-          } else if (path.includes('firebasestorage') || path.includes('/')) {
-            const imageRef = ref(storage, path);
-            await deleteObject(imageRef).catch(err => console.warn("Error deleting Firebase image:", err));
-          }
-        }
-      });
-
-      if (videoToDelete && videoToDelete.trim() !== '') {
-        const videoRef = ref(storage, videoToDelete);
-        await deleteObject(videoRef).catch(err => console.warn("Error deleting video:", err));
-      }
-
-      await Promise.all([...deleteImagePromises]);
-    } catch (error) {
-      console.error("Error deleting old files:", error);
+    if (videoToDelete && videoToDelete.trim() !== '') {
+      const videoRef = ref(storage, videoToDelete);
+      await deleteObject(videoRef);
     }
   };
 
@@ -846,15 +824,11 @@ if (
       let mainDownloadURL = null;
       let videoDownloadURL = null;
 
-      // 1. Delete old files
-      if (imagesToDelete.length > 0 || videoToDelete) {
-        await deleteFilesFromStorage();
-      }
-
       // 2. Handle Main Image (Upload to MongoDB)
       if (mainImageFile) {
         const uploadedMain = await uploadImageToMongoDB(mainImageFile.file, {
           productId: productId,
+          associatedRecordId: productId,
           isMain: true,
           color: '',
           role: 'product',
@@ -889,6 +863,7 @@ if (
       const galleryUploadPromises = newGalleryImages.map(async (imageObj) => {
         const uploaded = await uploadImageToMongoDB(imageObj.file, {
           productId: productId,
+          associatedRecordId: productId,
           isMain: false,
           color: imageObj.color || '',
           role: 'product',
@@ -999,9 +974,13 @@ if (
       const productRef = doc(db, "products", productId);
       await updateDoc(productRef, productToUpdate);
 
+      if (imagesToDelete.length > 0 || videoToDelete) {
+        await deleteFilesFromStorage();
+      }
+
       // 7. Success
       setShowSuccessModal(true);
-      setMessage("✅ Product updated successfully! All images stored properly in Firebase.");
+      setMessage("✅ Product updated successfully! Images are stored in MongoDB.");
 
     } catch (error) {
       console.error("Firebase update error:", error);

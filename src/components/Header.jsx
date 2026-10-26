@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { FiChevronDown, FiMenu, FiBarChart2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
+import { resolveImageUrl } from "../utils/imageUtils";
 
 export default function Header({ onToggleSidebar, onLogout, user, onUserUpdate }) {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ export default function Header({ onToggleSidebar, onLogout, user, onUserUpdate }
       // First try to get from props
       if (user) {
         setAdmin(user);
-        setProfileImage(user.photoURL && user.photoURL.trim() ? user.photoURL : DEFAULT_AVATAR);
+        setProfileImage(user.photoURL && user.photoURL.trim() ? resolveImageUrl(user.photoURL) : DEFAULT_AVATAR);
         return;
       }
 
@@ -28,7 +29,7 @@ export default function Header({ onToggleSidebar, onLogout, user, onUserUpdate }
       if (stored && stored !== "undefined" && stored !== "null") {
         const parsed = JSON.parse(stored);
         setAdmin(parsed);
-        setProfileImage(parsed.photoURL && parsed.photoURL.trim() ? parsed.photoURL : DEFAULT_AVATAR);
+        setProfileImage(parsed.photoURL && parsed.photoURL.trim() ? resolveImageUrl(parsed.photoURL) : DEFAULT_AVATAR);
       } else {
         setProfileImage(DEFAULT_AVATAR);
       }
@@ -47,7 +48,7 @@ export default function Header({ onToggleSidebar, onLogout, user, onUserUpdate }
     const handleProfileUpdate = (event) => {
       if (event.detail) {
         setAdmin(event.detail);
-        setProfileImage(event.detail.photoURL && event.detail.photoURL.trim() ? event.detail.photoURL : DEFAULT_AVATAR);
+        setProfileImage(event.detail.photoURL && event.detail.photoURL.trim() ? resolveImageUrl(event.detail.photoURL) : DEFAULT_AVATAR);
         
         // Update localStorage if needed
         localStorage.setItem("adminUser", JSON.stringify(event.detail));

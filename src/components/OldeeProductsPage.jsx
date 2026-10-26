@@ -14,9 +14,9 @@ import {
     getDocs,
     writeBatch 
 } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-
 import { db } from "../firebase";
+import { uploadImageToMongoDB, getMongoImageId, deleteImageFromMongoDB } from "../services/imageService";
+import { resolveImageUrl } from "../utils/imageUtils";
 import { 
     FiUser, 
     FiRefreshCw, 
@@ -45,8 +45,6 @@ import {
     FiSearch,
     FiFilter
 } from "react-icons/fi";
-const storage = getStorage();
-
 // Format Firestore timestamp
 const formatDate = (timestamp) => {
     if (!timestamp) return "N/A";
@@ -98,7 +96,7 @@ const ProductViewModal = ({ product, onClose, onEdit, onDelete, onToggleStatus, 
                         <div className="mb-6">
                             <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center h-64">
                                 <img
-                                    src={product.imageURLs?.[0] || "https://via.placeholder.com/300x200"}
+                                    src={resolveImageUrl(product.imageURLs?.[0])}
                                     alt={product.name}
                                     className="max-h-56 max-w-full object-contain rounded-lg"
                                 />
@@ -108,7 +106,7 @@ const ProductViewModal = ({ product, onClose, onEdit, onDelete, onToggleStatus, 
                                     {product.imageURLs.slice(1).map((url, index) => (
                                         <img
                                             key={index}
-                                            src={url}
+                                            src={resolveImageUrl(url)}
                                             alt={`${product.name} ${index + 2}`}
                                             className="w-16 h-16 object-cover rounded border"
                                         />
@@ -647,31 +645,27 @@ const [newImages, setNewImages] = useState([]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setIsSaving(true);
-        setEditError(null);
-        let uploadedImageURLs = [...formData.imageURLs];
-
-if (newImages.length > 0) {
-  for (const file of newImages) {
-    const imageRef = ref(
-      storage,
-      `oldee-products/${formData.id}/${Date.now()}-${file.name}`
-    );
-
-    await uploadBytes(imageRef, file);
-    const downloadURL = await getDownloadURL(imageRef);
-    uploadedImageURLs.push(downloadURL);
-  }
-}
-
-
         if (!formData.name || !formData.price) {
             setEditError("Product Name and Price are required.");
-            setIsSaving(false);
             return;
         }
 
+        setIsSaving(true);
+        setEditError(null);
+        let uploadedImageURLs = [...formData.imageURLs];
+        const removedImageURLs = (productData.imageURLs || []).filter((url) => !formData.imageURLs.includes(url));
+
         try {
+            if (newImages.length > 0) {
+                for (const file of newImages) {
+                    const uploaded = await uploadImageToMongoDB(file, {
+                        associatedRecordId: formData.id,
+                        role: 'oldee-product',
+                    });
+                    uploadedImageURLs.push(uploaded.url);
+                }
+            }
+
             const productRef = doc(db, "oldee", formData.id);
             
            const updatedData = {
@@ -683,6 +677,12 @@ imageURLs: uploadedImageURLs,
 };
 
             await updateDoc(productRef, updatedData);
+            await Promise.all(
+                removedImageURLs
+                    .map(getMongoImageId)
+                    .filter(Boolean)
+                    .map(deleteImageFromMongoDB)
+            );
             
             onSaveSuccess(`Product "${formData.name}" updated successfully!`); 
             onSave(); 
@@ -721,7 +721,7 @@ imageURLs: uploadedImageURLs,
       className="relative group rounded-md overflow-hidden bg-gray-100"
     >
       <img
-        src={url}
+        src={resolveImageUrl(url)}
         alt={`product-${index}`}
         className="w-full h-24 object-cover"
       />
@@ -1578,7 +1578,7 @@ const OldeeProductsPage = () => {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center space-x-3">
                                                     <img
-                                                        src={product.imageURLs?.[0] || "https://via.placeholder.com/80"}
+                                                        src={resolveImageUrl(product.imageURLs?.[0])}
                                                         alt={product.name}
                                                         className="w-20 h-22 rounded-lg border object-fit"
                                                     />

@@ -6,6 +6,7 @@ import {
   query
 } from "firebase/firestore";
 import { db } from "../../firebase";
+import { resolveImageUrl } from "../../utils/imageUtils";
 import {
   FiTrash2,
   FiSearch,
@@ -56,7 +57,7 @@ const HistoryModal = ({ open, onClose, item }) => {
           <div className="flex gap-4 items-center">
             {item.imageUrl ? (
               <img
-                src={item.imageUrl}
+                src={resolveImageUrl(item.imageUrl)}
                 alt=""
                 className="w-20 h-20 rounded-xl object-cover"
               />

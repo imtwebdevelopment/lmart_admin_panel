@@ -16,6 +16,8 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
+import { uploadImageToMongoDB, isImageFile } from "../services/imageService";
+import { resolveImageUrl } from "../utils/imageUtils";
 import {
   FiFileText,
   FiDownload,
@@ -230,21 +232,39 @@ const UserFilesView = ({ user, onClose, onUpload }) => {
     setUploadError(null);
 
     const uniqueFileId = uuidv4();
-    const storageRef = ref(storage, `uploadfile/${user.uploadDocId}/${selectedFile.name}_${uniqueFileId}`);
 
     try {
-      const snapshot = await uploadBytes(storageRef, selectedFile);
-      const adminFile = await getDownloadURL(snapshot.ref);
+      let adminFile;
+      let storagePath;
+      let imageId = '';
+      let fileType = selectedFile.type;
+      if (isImageFile(selectedFile)) {
+        const uploaded = await uploadImageToMongoDB(selectedFile, {
+          associatedRecordId: user.uploadDocId,
+          role: 'customer-file',
+        });
+        adminFile = uploaded.url;
+        storagePath = uploaded.path;
+        imageId = uploaded.id;
+        fileType = uploaded.contentType;
+      } else {
+        const storageRef = ref(storage, `uploadfile/${user.uploadDocId}/${selectedFile.name}_${uniqueFileId}`);
+        const snapshot = await uploadBytes(storageRef, selectedFile);
+        adminFile = await getDownloadURL(snapshot.ref);
+        storagePath = snapshot.ref.fullPath;
+      }
 
       const fileMetadata = {
         fileId: uniqueFileId,
         originalName: selectedFile.name,
-        fileType: selectedFile.type,
+        fileType,
         fileSize: selectedFile.size,
         downloads: 0,
         uploadedAt: Timestamp.now(),
-        storagePath: snapshot.ref.fullPath,
+        storagePath,
         adminFile,
+        downloadURL: adminFile,
+        imageId,
         adminUploaded: true,
         status: "Admin Uploaded",
       };
@@ -468,7 +488,7 @@ const UserFilesView = ({ user, onClose, onUpload }) => {
                         </div>
                       </div>
                       <button 
-                        onClick={() => window.open(file.downloadURL, '_blank')}
+                        onClick={() => window.open(resolveImageUrl(file.downloadURL), '_blank')}
                         className="ml-2 sm:ml-4 p-1 sm:p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0"
                       >
                         <FiDownload className="w-4 h-4 sm:w-5 sm:h-5" />

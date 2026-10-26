@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { db } from "../firebase";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { Camera, User, Mail, Save, ArrowLeft, Upload } from "lucide-react";
+import { uploadImageToMongoDB, deleteMongoImageReference } from "../services/imageService";
+import { resolveImageUrl } from "../utils/imageUtils";
 
 // Add CSS as a string for the animation
 const fadeInAnimation = `
@@ -50,7 +52,7 @@ export default function ProfilePage() {
         email: parsed.email || "",
         photoURL: parsed.photoURL || "",
       });
-      setImagePreview(parsed.photoURL && parsed.photoURL.trim() ? parsed.photoURL : "/default-avatar.svg");
+      setImagePreview(parsed.photoURL && parsed.photoURL.trim() ? resolveImageUrl(parsed.photoURL) : "/default-avatar.svg");
     } catch (err) {
       console.error("Invalid JSON in adminUser:", err);
       setUser(null);
@@ -104,13 +106,14 @@ export default function ProfilePage() {
     setIsUploading(true);
     setError("");
     
-    // Create local preview URL
-    const reader = new FileReader();
-    
-    reader.onloadend = () => {
-      const imageUrl = reader.result;
+    try {
+      const uploaded = await uploadImageToMongoDB(file, {
+        associatedRecordId: user?.uid || '',
+        role: 'admin-profile',
+      });
+      const imageUrl = uploaded.url;
       setForm(prev => ({ ...prev, photoURL: imageUrl }));
-      setImagePreview(imageUrl);
+      setImagePreview(resolveImageUrl(imageUrl));
       setIsUploading(false);
       setSuccess("Image uploaded successfully!");
       
@@ -121,14 +124,11 @@ export default function ProfilePage() {
       }
       
       setTimeout(() => setSuccess(""), 3000);
-    };
-    
-    reader.onerror = () => {
+    } catch (uploadError) {
+      console.error("Admin profile image upload failed:", uploadError);
       setIsUploading(false);
-      setError("Error uploading image. Please try again.");
-    };
-    
-    reader.readAsDataURL(file);
+      setError(`Image upload failed: ${uploadError.message}`);
+    }
   };
 
   const handleUpdate = async (e) => {
@@ -156,6 +156,9 @@ export default function ProfilePage() {
 
       // Update in Firebase
       await updateDoc(userRef, updatedData);
+      if (user.photoURL && user.photoURL !== form.photoURL) {
+        await deleteMongoImageReference(user.photoURL);
+      }
 
       // Update local storage and state
       const newUser = { ...user, ...updatedData };

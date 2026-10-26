@@ -24,25 +24,33 @@ function isYouTubeUrl(url) {
   return url.includes("youtube.com") || url.includes("youtu.be");
 }
 
-async function uploadImageFromUrl(imageUrl, destinationPath) {
+async function uploadImageFromUrl(imageUrl, destinationPath, recordId) {
   if (!imageUrl) return null;
 
   const response = await fetch(normalizeDriveUrl(imageUrl));
   if (!response.ok) throw new Error(`Image download failed`);
 
   const buffer = await response.buffer();
-  const file = bucket.file(destinationPath);
+  const apiBase = process.env.IMAGE_API_URL;
+  if (!apiBase) throw new Error("IMAGE_API_URL must point to the MongoDB image backend API");
 
-  await file.save(buffer, {
-    resumable: false,
-    metadata: {
-      contentType: response.headers.get("content-type") || "image/jpeg",
-    },
+  const formData = new FormData();
+  formData.append("image", new Blob([buffer], {
+    type: response.headers.get("content-type") || "image/jpeg",
+  }), destinationPath.split("/").pop() || "image.jpg");
+  formData.append("associatedRecordId", recordId);
+  formData.append("role", "product");
+
+  const uploadResponse = await globalThis.fetch(`${apiBase.replace(/\/+$/, "")}/images/upload`, {
+    method: "POST",
+    body: formData,
   });
+  if (!uploadResponse.ok) {
+    throw new Error(`MongoDB image upload failed (${uploadResponse.status}): ${await uploadResponse.text()}`);
+  }
 
-  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(
-    destinationPath
-  )}?alt=media`;
+  const result = await uploadResponse.json();
+  return `/api/images/${result.id}`;
 }
 
 async function uploadVideoFromUrl(videoUrl, destinationPath) {
@@ -87,7 +95,8 @@ exports.processProductImages = onDocumentCreated(
       if (product?.sourceImages?.main) {
         mainImageUrl = await uploadImageFromUrl(
           product.sourceImages.main,
-          `product-images/${sku}/main.jpg`
+          `product-images/${sku}/main.jpg`,
+          snap.id
         );
       }
 
@@ -98,7 +107,8 @@ exports.processProductImages = onDocumentCreated(
 
           const url = await uploadImageFromUrl(
             img,
-            `product-images/${sku}/gallery_${i}.jpg`
+            `product-images/${sku}/gallery_${i}.jpg`,
+            snap.id
           );
           if (url) galleryUrls.push(url);
         }

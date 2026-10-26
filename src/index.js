@@ -14,7 +14,6 @@ const sharp = require('sharp'); // For image manipulation (resizing/conversion)
 admin.initializeApp();
 
 const db = admin.firestore();
-const storage = admin.storage();
 
 // Define image sizes for optimization (WebP format is used for efficiency)
 const IMAGE_SIZES = [
@@ -24,9 +23,9 @@ const IMAGE_SIZES = [
 ];
 
 /**
- * Downloads an image from a URL, processes it, and uploads it to Firebase Storage.
+ * Downloads an image from a URL, processes it, and stores it through the MongoDB image API.
  */
-async function processAndUploadImage(imageUrl, imageMeta) {
+async function processAndUploadImage(imageUrl, imageMeta, productId) {
     if (!imageUrl || imageMeta.type !== 'external' || imageMeta.status !== 'pending') {
         return imageMeta; 
     }
@@ -39,36 +38,38 @@ async function processAndUploadImage(imageUrl, imageMeta) {
         });
         
         const originalBuffer = response.data;
-        const bucket = storage.bucket();
-        
         const newUrls = {};
+        const imageIds = {};
+        const apiBase = process.env.IMAGE_API_URL || process.env.VITE_API_URL;
+        if (!apiBase) {
+            throw new Error('IMAGE_API_URL must point to the MongoDB image backend API');
+        }
+        const imageApiBase = apiBase.replace(/\/+$/, '');
 
-        // 2. Process and Upload to Storage for each size concurrently
+        // 2. Process and store each image size through the MongoDB image API.
         const uploadPromises = IMAGE_SIZES.map(async ({ size, suffix }) => {
-            // Path structure: products/{variantId_...}/{size}.webp
-            const filePath = `${imageMeta.path}/${suffix}.webp`; 
-            const file = bucket.file(filePath);
-
-            // Resize and convert to WebP using sharp
             const resizedBuffer = await sharp(originalBuffer)
                 .resize(size, size, { fit: 'inside', withoutEnlargement: true })
                 .webp({ quality: 80 })
                 .toBuffer();
 
-            await file.save(resizedBuffer, {
-                metadata: {
-                    contentType: 'image/webp',
-                    cacheControl: 'public, max-age=31536000', 
-                },
-            });
+            const formData = new FormData();
+            formData.append('image', new Blob([resizedBuffer], { type: 'image/webp' }), `${suffix}.webp`);
+            formData.append('associatedRecordId', productId);
+            formData.append('role', 'product-processed');
+            formData.append('isMain', String(imageMeta.isMain === true && suffix === 'medium'));
 
-            // Get the public download URL (signed URL)
-            const [url] = await file.getSignedUrl({
-                action: 'read',
-                expires: '03-01-2500', 
+            const uploadResponse = await fetch(`${imageApiBase}/images/upload`, {
+                method: 'POST',
+                body: formData,
             });
+            if (!uploadResponse.ok) {
+                throw new Error(`MongoDB image upload failed (${uploadResponse.status}): ${await uploadResponse.text()}`);
+            }
 
-            newUrls[suffix] = url;
+            const uploaded = await uploadResponse.json();
+            newUrls[suffix] = `/api/images/${uploaded.id}`;
+            imageIds[suffix] = uploaded.id;
         });
 
         await Promise.all(uploadPromises);
@@ -76,9 +77,10 @@ async function processAndUploadImage(imageUrl, imageMeta) {
         // 3. Return updated metadata
         return {
             ...imageMeta,
-            type: 'storage', 
+            type: 'mongodb',
             url: newUrls.medium, 
             urls: newUrls, 
+            imageIds,
             status: 'completed',
             processedAt: admin.firestore.FieldValue.serverTimestamp()
         };
@@ -115,7 +117,7 @@ exports.processProductImages = functions.firestore
         
         // 2. Process all image URLs concurrently
         const imageProcessingPromises = productData.imageUrls.map(imageMeta => 
-            processAndUploadImage(imageMeta.url, imageMeta)
+            processAndUploadImage(imageMeta.url, imageMeta, productId)
         );
 
         const updatedImageUrls = await Promise.all(imageProcessingPromises);

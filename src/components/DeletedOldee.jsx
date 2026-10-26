@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from "../firebase"; // Ensure this path is correct for your project
+import { resolveImageUrl } from "../utils/imageUtils";
 import { 
   Archive, Calendar, Search, X, 
   AlertTriangle, Package, Info, User
@@ -164,7 +165,7 @@ const DeletedOldeeTable = () => {
                         <div className="h-12 w-12 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden border">
                           {/* Corrected image check using imageURLs array */}
                           {item.imageURLs && item.imageURLs.length > 0 ? (
-                            <img src={item.imageURLs[0]} alt="" className="h-full w-full object-cover" />
+                            <img src={resolveImageUrl(item.imageURLs[0])} alt="" className="h-full w-full object-cover" />
                           ) : (
                             <Package className="h-full w-full p-2 text-gray-400" />
                           )}
@@ -226,7 +227,7 @@ const DeletedOldeeTable = () => {
                 <div className="h-24 w-24 bg-white rounded-lg border overflow-hidden flex-shrink-0">
                   {/* Corrected image check inside Modal */}
                   {selectedItem.imageURLs && selectedItem.imageURLs.length > 0 ? (
-                    <img src={selectedItem.imageURLs[0]} className="h-full w-full object-cover" alt="" />
+                    <img src={resolveImageUrl(selectedItem.imageURLs[0])} className="h-full w-full object-cover" alt="" />
                   ) : <Package className="h-full w-full p-4 text-gray-300" />}
                 </div>
                 <div>
