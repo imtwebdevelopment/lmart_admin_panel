@@ -29,22 +29,33 @@ export const resolveImageUrl = (img) => {
 
   if (!raw) return FALLBACK_IMAGE;
 
+  // 1. If it's a mongodb:// URI (e.g. mongodb://6adf...)
   const mongoUri = raw.match(/^mongodb:\/\/([0-9a-fA-F]{24})$/);
   if (mongoUri) return getMongoImageUrl(mongoUri[1]);
 
+  // 2. If it's a pure ObjectId string (24 hex characters)
   if (/^[0-9a-fA-F]{24}$/.test(raw)) {
     return getMongoImageUrl(raw);
   }
 
-  const imagePath = raw.match(/(?:^|\/)api\/images\/([0-9a-fA-F]{24})(?:[?#].*)?$/);
-  if (imagePath) return getMongoImageUrl(imagePath[1]);
+  // 3. If it contains /api/images/:id anywhere (relative path, localhost URL, 127.0.0.1, or old backend domain)
+  const imageMatch = raw.match(/(?:^|https?:\/\/[^/]+)?\/api\/images\/([0-9a-fA-F]{24})(?:[?#].*)?$/i);
+  if (imageMatch) {
+    return getMongoImageUrl(imageMatch[1]);
+  }
 
+  // 4. Data URLs (e.g. base64 preview)
+  if (raw.startsWith('data:')) return raw;
+
+  // 5. Any other HTTP/HTTPS URL (Firebase, Cloudinary, S3, etc.)
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     try {
-      const legacyUrl = new URL(raw);
-      const isLoopback = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\])$/i.test(legacyUrl.hostname);
-      const legacyImageId = legacyUrl.pathname.match(/^\/api\/images\/([0-9a-fA-F]{24})$/);
-      if (isLoopback && legacyImageId) return getMongoImageUrl(legacyImageId[1]);
+      const parsedUrl = new URL(raw);
+      const isLoopback = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\])$/i.test(parsedUrl.hostname);
+      const hexMatch = parsedUrl.pathname.match(/([0-9a-fA-F]{24})/);
+      if (isLoopback && hexMatch) {
+        return getMongoImageUrl(hexMatch[1]);
+      }
     } catch (error) {
       console.error('Unable to resolve image URL:', error);
     }
