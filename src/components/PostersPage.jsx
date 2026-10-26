@@ -4,8 +4,9 @@ import { FiImage, FiUploadCloud, FiXCircle, FiEdit, FiSave, FiTrash2, FiPlus, Fi
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-// Assuming you have your firebase config exported from this path
 import { db, storage } from "../firebase"; 
+import { uploadImageToMongoDB, deleteImageFromMongoDB } from "../services/imageService";
+import { resolveImageUrl, handleImageError, FALLBACK_IMAGE } from "../utils/imageUtils"; 
 
 // Enhanced image compression utility
 const compressImage = (file, maxWidth = 1200, quality = 0.7) => {
@@ -66,10 +67,11 @@ const compressImage = (file, maxWidth = 1200, quality = 0.7) => {
 // Utility to check if image exists and is accessible
 const checkImageAvailability = (url) => {
   return new Promise((resolve) => {
+    if (!url) return resolve(false);
     const img = new Image();
     img.onload = () => resolve(true);
     img.onerror = () => resolve(false);
-    img.src = url;
+    img.src = resolveImageUrl(url);
     
     // Timeout after 10 seconds
     setTimeout(() => resolve(false), 10000);
@@ -158,7 +160,9 @@ export default function PostersPage() {
     setImageErrors(prev => ({ ...prev, [posterId]: false }));
     
     // Add cache busting parameter
-    const cacheBustingUrl = `${imageUrl}?retry=${Date.now()}`;
+    const resolved = resolveImageUrl(imageUrl);
+    const separator = resolved.includes('?') ? '&' : '?';
+    const cacheBustingUrl = `${resolved}${separator}retry=${Date.now()}`;
     
     // Create a new image element to test
     const img = new Image();
@@ -212,11 +216,18 @@ export default function PostersPage() {
         fileToUpload = await compressImage(selectedFile);
       }
       
-      // Upload image to Storage
-      const imageRef = ref(storage, `posters/${Date.now()}-${fileToUpload.name}`);
-      await uploadBytes(imageRef, fileToUpload);
-
-      const imageURL = await getDownloadURL(imageRef);
+      let imageURL = '';
+      try {
+        const uploadResult = await uploadImageToMongoDB(fileToUpload, {
+          role: 'banner',
+        });
+        imageURL = uploadResult.imageUrl || uploadResult.url;
+      } catch (mongoErr) {
+        console.warn("MongoDB upload failed, attempting Firebase Storage fallback:", mongoErr);
+        const imageRef = ref(storage, `posters/${Date.now()}-${fileToUpload.name}`);
+        await uploadBytes(imageRef, fileToUpload);
+        imageURL = await getDownloadURL(imageRef);
+      }
 
       // Save in Firestore
       const posterData = {
@@ -271,6 +282,21 @@ export default function PostersPage() {
     // Removed: if (!window.confirm("Are you sure you want to delete this poster? This action cannot be undone.")) return;
 
     try {
+      const posterToDelete = posters.find(p => p.id === id);
+      if (posterToDelete?.imageUrl) {
+        const raw = posterToDelete.imageUrl;
+        let imageId = null;
+        if (raw.startsWith('mongodb://')) {
+          imageId = raw.replace('mongodb://', '');
+        } else {
+          const match = raw.match(/\/api\/images\/([0-9a-fA-F]{24})/);
+          if (match) imageId = match[1];
+        }
+        if (imageId) {
+          await deleteImageFromMongoDB(imageId).catch(e => console.warn("Failed to delete MongoDB image:", e));
+        }
+      }
+
       await deleteDoc(doc(db, "posters", id));
       setPosters(posters.filter(p => p.id !== id));
       
@@ -526,7 +552,7 @@ export default function PostersPage() {
                     {/* Actual Image - Only show if not errored */}
                     {!imageErrors[poster.id] && (
                       <img 
-                        src={poster.imageUrl} 
+                        src={resolveImageUrl(poster.imageUrl)} 
                         alt={poster.title}
                         className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${
                           loadingImages[poster.id] === false ? 'opacity-100' : 'opacity-0'

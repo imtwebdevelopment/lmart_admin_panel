@@ -6,7 +6,8 @@ export default function Header({ onToggleSidebar, onLogout, user, onUserUpdate }
   const navigate = useNavigate();
   const [admin, setAdmin] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [profileImage, setProfileImage] = useState("/default-avatar.png");
+  const DEFAULT_AVATAR = "/default-avatar.svg";
+  const [profileImage, setProfileImage] = useState(DEFAULT_AVATAR);
 
   // Load user data on mount and when user prop changes
   useEffect(() => {
@@ -18,7 +19,7 @@ export default function Header({ onToggleSidebar, onLogout, user, onUserUpdate }
       // First try to get from props
       if (user) {
         setAdmin(user);
-        setProfileImage(user.photoURL || "/default-avatar.png");
+        setProfileImage(user.photoURL && user.photoURL.trim() ? user.photoURL : DEFAULT_AVATAR);
         return;
       }
 
@@ -27,11 +28,13 @@ export default function Header({ onToggleSidebar, onLogout, user, onUserUpdate }
       if (stored && stored !== "undefined" && stored !== "null") {
         const parsed = JSON.parse(stored);
         setAdmin(parsed);
-        setProfileImage(parsed.photoURL || "/default-avatar.png");
+        setProfileImage(parsed.photoURL && parsed.photoURL.trim() ? parsed.photoURL : DEFAULT_AVATAR);
+      } else {
+        setProfileImage(DEFAULT_AVATAR);
       }
     } catch (err) {
       console.error("Error loading user data:", err);
-      setProfileImage("/default-avatar.png");
+      setProfileImage(DEFAULT_AVATAR);
     }
   };
 
@@ -44,7 +47,7 @@ export default function Header({ onToggleSidebar, onLogout, user, onUserUpdate }
     const handleProfileUpdate = (event) => {
       if (event.detail) {
         setAdmin(event.detail);
-        setProfileImage(event.detail.photoURL || "/default-avatar.png");
+        setProfileImage(event.detail.photoURL && event.detail.photoURL.trim() ? event.detail.photoURL : DEFAULT_AVATAR);
         
         // Update localStorage if needed
         localStorage.setItem("adminUser", JSON.stringify(event.detail));
@@ -61,8 +64,10 @@ export default function Header({ onToggleSidebar, onLogout, user, onUserUpdate }
   }, []);
 
   const handleImageError = (e) => {
-    e.target.src = "/default-avatar.png";
-    setProfileImage("/default-avatar.png");
+    if (e?.target && !e.target.src.endsWith(DEFAULT_AVATAR)) {
+      e.target.onerror = null;
+      e.target.src = DEFAULT_AVATAR;
+    }
   };
 
   const handleLogout = () => {

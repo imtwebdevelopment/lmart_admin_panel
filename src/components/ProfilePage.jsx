@@ -50,7 +50,7 @@ export default function ProfilePage() {
         email: parsed.email || "",
         photoURL: parsed.photoURL || "",
       });
-      setImagePreview(parsed.photoURL || "/default-avatar.png");
+      setImagePreview(parsed.photoURL && parsed.photoURL.trim() ? parsed.photoURL : "/default-avatar.svg");
     } catch (err) {
       console.error("Invalid JSON in adminUser:", err);
       setUser(null);
@@ -269,12 +269,14 @@ export default function ProfilePage() {
                 <div className="relative inline-block mb-6">
                   <div className="w-40 h-40 rounded-2xl overflow-hidden border-4 border-white shadow-2xl mx-auto">
                     <img
-                      src={imagePreview}
+                      src={imagePreview || "/default-avatar.svg"}
                       alt="Profile Preview"
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        e.target.src = "/default-avatar.png";
-                        setImagePreview("/default-avatar.png");
+                        if (e?.target && !e.target.src.endsWith("/default-avatar.svg")) {
+                          e.target.onerror = null;
+                          e.target.src = "/default-avatar.svg";
+                        }
                       }}
                     />
                   </div>

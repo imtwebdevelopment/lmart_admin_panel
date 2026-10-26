@@ -31,6 +31,8 @@ import {
 import {
   ref, uploadBytes, getDownloadURL, deleteObject
 } from "firebase/storage";
+import { uploadImageToMongoDB, deleteImageFromMongoDB } from "../../services/imageService";
+import { resolveImageUrl, handleImageError } from "../../utils/imageUtils";
 
 // Reusable functions
 const normalizeImages = (imageUrls, mainImageUrl) => {
@@ -158,6 +160,7 @@ const SortableGalleryItem = ({
       <img
         src={image.url}
         alt={image.name}
+        onError={handleImageError}
         className="w-full h-20 object-contain pointer-events-none"
       />
 
@@ -324,11 +327,11 @@ const EditProductPage = () => {
         if (productData.imageUrls && Array.isArray(productData.imageUrls)) {
           if (typeof productData.imageUrls[0] === 'string') {
             normalizedImages = productData.imageUrls.map((url, index) => ({
-              url: url,
+              url: resolveImageUrl(url),
               isMain: index === 0 && !productData.mainImageUrl,
               color: '',
               name: `image-${index + 1}`,
-              path: '',
+              path: url,
               type: 'file',
               isExisting: true,
               id: `existing-${Date.now()}-${index}`
@@ -336,6 +339,7 @@ const EditProductPage = () => {
           } else {
             normalizedImages = productData.imageUrls.map((img, index) => ({
               ...img,
+              url: resolveImageUrl(img.url),
               id: img.id || `existing-${Date.now()}-${index}`,
               isExisting: true
             }));
@@ -344,8 +348,8 @@ const EditProductPage = () => {
 
         const mainImage = normalizedImages.find(img => img.isMain) || 
           (productData.mainImageUrl ? {
-            url: productData.mainImageUrl,
-            path: '',
+            url: resolveImageUrl(productData.mainImageUrl),
+            path: productData.mainImageUrl,
             name: 'Main Image',
             id: 'existing-main',
             isMain: true,
@@ -780,8 +784,20 @@ if (
     try {
       const deleteImagePromises = imagesToDelete.map(async (path) => {
         if (path && path.trim() !== '') {
-          const imageRef = ref(storage, path);
-          await deleteObject(imageRef).catch(err => console.warn("Error deleting image:", err));
+          let imageId = null;
+          if (path.startsWith('mongodb://')) {
+            imageId = path.replace('mongodb://', '');
+          } else {
+            const match = path.match(/\/api\/images\/([0-9a-fA-F]{24})/);
+            if (match) imageId = match[1];
+          }
+
+          if (imageId) {
+            await deleteImageFromMongoDB(imageId).catch(err => console.warn("Error deleting MongoDB image:", err));
+          } else if (path.includes('firebasestorage') || path.includes('/')) {
+            const imageRef = ref(storage, path);
+            await deleteObject(imageRef).catch(err => console.warn("Error deleting Firebase image:", err));
+          }
         }
       });
 
@@ -835,16 +851,21 @@ if (
         await deleteFilesFromStorage();
       }
 
-      // 2. Handle Main Image
+      // 2. Handle Main Image (Upload to MongoDB)
       if (mainImageFile) {
-        const mainResult = await uploadFileToFirebase(mainImageFile.file, 'products', 'main');
-        mainDownloadURL = mainResult.url;
+        const uploadedMain = await uploadImageToMongoDB(mainImageFile.file, {
+          productId: productId,
+          isMain: true,
+          color: '',
+          role: 'product',
+        });
+        mainDownloadURL = uploadedMain.url;
         
         imageUrls.push({
-          url: mainResult.url,
-          name: mainResult.name,
-          path: mainResult.path,
-          type: 'file',
+          url: uploadedMain.url,
+          name: uploadedMain.name,
+          path: uploadedMain.path,
+          type: 'mongodb',
           isMain: true,
           color: '',
         });
@@ -857,7 +878,7 @@ if (
         mainDownloadURL = productData.existingMainImage.url;
       }
 
-      // 3. Handle Gallery Images
+      // 3. Handle Gallery Images (Upload new ones to MongoDB)
       setMessage("📤 Uploading gallery images...");
       
       const existingGalleryImages = galleryFiles.filter(img => img.isExisting && 
@@ -865,29 +886,23 @@ if (
       
       const newGalleryImages = galleryFiles.filter(img => !img.isExisting && img.file);
 
-    // Count existing gallery images
-const existingGalleryCount = imageUrls.filter(img => !img.isMain).length;
+      const galleryUploadPromises = newGalleryImages.map(async (imageObj) => {
+        const uploaded = await uploadImageToMongoDB(imageObj.file, {
+          productId: productId,
+          isMain: false,
+          color: imageObj.color || '',
+          role: 'product',
+        });
 
-const galleryUploadPromises = newGalleryImages.map(async (imageObj, index) => {
-  const galleryIndex = existingGalleryCount + index + 1; // 1-based index
-  const customName = `galleryimage${galleryIndex}`;
-
-  const result = await uploadFileToFirebase(
-    imageObj.file,
-    'products',
-    customName
-  );
-
-  return {
-    url: result.url,
-    name: result.name,
-    path: result.path,
-    type: 'file',
-    isMain: false,
-    color: imageObj.color || '',
-  };
-});
-
+        return {
+          url: uploaded.url,
+          name: uploaded.name,
+          path: uploaded.path,
+          type: 'mongodb',
+          isMain: false,
+          color: imageObj.color || '',
+        };
+      });
 
       const uploadedGalleryImages = await Promise.all(galleryUploadPromises);
       
@@ -896,7 +911,7 @@ const galleryUploadPromises = newGalleryImages.map(async (imageObj, index) => {
           url: img.url,
           name: img.name,
           path: img.path || '',
-          type: 'file',
+          type: img.type || 'file',
           isMain: false,
           color: img.color || '',
         });
@@ -1004,23 +1019,27 @@ const galleryUploadPromises = newGalleryImages.map(async (imageObj, index) => {
       if (existingProduct.imageUrls && Array.isArray(existingProduct.imageUrls)) {
         if (typeof existingProduct.imageUrls[0] === 'string') {
           normalizedImages = existingProduct.imageUrls.map((url, index) => ({
-            url: url,
+            url: resolveImageUrl(url),
             isMain: index === 0 && !existingProduct.mainImageUrl,
             color: '',
             name: `image-${index + 1}`,
-            path: '',
+            path: url,
             type: 'file',
             isExisting: true
           }));
         } else {
-          normalizedImages = existingProduct.imageUrls;
+          normalizedImages = existingProduct.imageUrls.map((img) => ({
+            ...img,
+            url: resolveImageUrl(img.url),
+            isExisting: true
+          }));
         }
       }
 
       const mainImage = normalizedImages.find(img => img.isMain) || 
         (existingProduct.mainImageUrl ? {
-          url: existingProduct.mainImageUrl,
-          path: '',
+          url: resolveImageUrl(existingProduct.mainImageUrl),
+          path: existingProduct.mainImageUrl,
           name: 'Main Image',
           isMain: true,
           isExisting: true
@@ -1281,8 +1300,9 @@ const galleryUploadPromises = newGalleryImages.map(async (imageObj, index) => {
                     ) : (
                       <div className="relative h-full rounded-2xl overflow-hidden shadow-xl group">
                         <img
-                          src={mainImageFile?.url || productData.existingMainImage?.url}
+                          src={resolveImageUrl(mainImageFile?.url || productData.existingMainImage?.url)}
                           alt="Main product"
+                          onError={handleImageError}
                           className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                         />
                         

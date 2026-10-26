@@ -37,26 +37,14 @@ import {
 
 import { db } from "../../firebase";
 
+import { getAdminProductImage, handleImageError } from "../../utils/imageUtils";
+
 // ==========================================================
 // UTILITY FUNCTIONS (Unchanged)
 // ==========================================================
 
 const getProductImage = (product) => {
-  if (product?.mainImageUrl) return product.mainImageUrl;
-
-  if (Array.isArray(product?.imageUrls)) {
-    const main = product.imageUrls.find(img => img.isMain);
-    if (main?.url) return main.url;
-    if (product.imageUrls[0]?.url) return product.imageUrls[0].url;
-  }
-
-  if (Array.isArray(product?.sourceImages?.gallery)) {
-    const img = product.sourceImages.gallery[0];
-    if (typeof img === "string") return img;
-    if (img?.url) return img.url;
-  }
-
-  return "/no-image.png";
+  return getAdminProductImage(product);
 };
 // Helper function to aggregate variant data for the list view
 const getVariantSummary = (variants) => {
@@ -579,6 +567,7 @@ const handleToggleTrending = async (product) => {
                                                     <img
                                                         src={getProductImage(product)}
                                                         alt={product.name}
+                                                        onError={handleImageError}
                                                         className="w-16 h-16 rounded-xl object-cover border border-gray-200 shadow-sm"
                                                     />
                                                 </div>

@@ -38,6 +38,7 @@ import {
   uploadBytes,
   getDownloadURL
 } from "firebase/storage";
+import { uploadImageToMongoDB } from "../../services/imageService";
 
 
 import {
@@ -548,42 +549,42 @@ const AddProductPage = () => {
       let mainDownloadURL = '';
       let videoDownloadURL = '';
 
-      // A. Main Image Upload
+      // A. Main Image Upload (MongoDB Image Storage)
       if (mainImageFile) {
         const mainFile = mainImageFile.file;
-        const mainFileName = `products/${Date.now()}_main_${mainFile.name}`;
-        const mainStorageRef = ref(storage, mainFileName);
-        await uploadBytes(mainStorageRef, mainFile);
-        mainDownloadURL = await getDownloadURL(mainStorageRef);
+        const uploadedMain = await uploadImageToMongoDB(mainFile, {
+          isMain: true,
+          color: '',
+          role: 'product',
+        });
+        mainDownloadURL = uploadedMain.url;
 
         imageUrls.push({
-          url: mainDownloadURL,
-          name: mainFile.name,
-          path: mainFileName,
-          type: 'file',
+          url: uploadedMain.url,
+          name: uploadedMain.name,
+          path: uploadedMain.path,
+          type: 'mongodb',
           isMain: true,
           color: '',
         });
       }
 
-      // B. Gallery Images Upload
-      // B. Gallery Images Upload (FIXED)
+      // B. Gallery Images Upload (MongoDB Image Storage)
       for (const imageObject of galleryFiles) {
         const galleryFile = imageObject.file;
-
-        const galleryFileName = `products/${Date.now()}_gallery_${galleryFile.name.replace(/\s+/g, "_")}`;
-        const galleryStorageRef = ref(storage, galleryFileName); // ✅ FIXED
-
-        await uploadBytes(galleryStorageRef, galleryFile);
-        const galleryDownloadURL = await getDownloadURL(galleryStorageRef);
+        const uploadedGallery = await uploadImageToMongoDB(galleryFile, {
+          isMain: false,
+          color: imageObject.color || '',
+          role: 'product',
+        });
 
         imageUrls.push({
-          url: galleryDownloadURL,
-          name: galleryFile.name,
-          path: galleryFileName,
-          type: "file",
+          url: uploadedGallery.url,
+          name: uploadedGallery.name,
+          path: uploadedGallery.path,
+          type: 'mongodb',
           isMain: false,
-          color: imageObject.color || "",
+          color: imageObject.color || '',
         });
       }
 
