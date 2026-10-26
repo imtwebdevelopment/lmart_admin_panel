@@ -1,10 +1,13 @@
+import { API_BASE } from './apiConfig';
+
 /**
  * Utility functions for resolving product images in Admin panel.
  * Handles both legacy Firebase Storage URLs and new MongoDB-stored images.
  */
 
 export const FALLBACK_IMAGE = '/no-image.svg';
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '');
+
+const getMongoImageUrl = (id) => `${API_BASE.replace(/\/$/, '')}/images/${id}`;
 
 export const handleImageError = (e) => {
   if (e?.target && !e.target.src.endsWith(FALLBACK_IMAGE)) {
@@ -20,24 +23,32 @@ export const resolveImageUrl = (img) => {
   if (typeof img === 'string') {
     raw = img.trim();
   } else if (typeof img === 'object') {
-    raw = (img.url || img.src || '').trim();
+    const imageReference = img.url || img.src || img.mainImageUrl || img.imageUrl;
+    raw = typeof imageReference === 'string' ? imageReference.trim() : '';
   }
 
   if (!raw) return FALLBACK_IMAGE;
 
-  if (raw.startsWith('mongodb://')) {
-    const id = raw.replace('mongodb://', '');
-    return API_BASE ? `${API_BASE.replace(/\/$/, '')}/images/${id}` : `/api/images/${id}`;
-  }
+  const mongoUri = raw.match(/^mongodb:\/\/([0-9a-fA-F]{24})$/);
+  if (mongoUri) return getMongoImageUrl(mongoUri[1]);
 
   if (/^[0-9a-fA-F]{24}$/.test(raw)) {
-    return API_BASE ? `${API_BASE.replace(/\/$/, '')}/images/${raw}` : `/api/images/${raw}`;
+    return getMongoImageUrl(raw);
   }
 
-  if (raw.startsWith('/api/images')) {
-    return API_BASE ? `${API_BASE.replace(/\/api\/?$/, '')}${raw}` : raw;
-  }
+  const imagePath = raw.match(/(?:^|\/)api\/images\/([0-9a-fA-F]{24})(?:[?#].*)?$/);
+  if (imagePath) return getMongoImageUrl(imagePath[1]);
 
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    try {
+      const legacyUrl = new URL(raw);
+      const isLoopback = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\])$/i.test(legacyUrl.hostname);
+      const legacyImageId = legacyUrl.pathname.match(/^\/api\/images\/([0-9a-fA-F]{24})$/);
+      if (isLoopback && legacyImageId) return getMongoImageUrl(legacyImageId[1]);
+    } catch (error) {
+      console.error('Unable to resolve image URL:', error);
+    }
+  }
   return raw;
 };
 

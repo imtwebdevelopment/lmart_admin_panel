@@ -1,6 +1,6 @@
 // Service to interact with the MongoDB Image Storage API
 
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '');
+import { API_BASE } from '../utils/apiConfig';
 
 const getApiBase = () => {
   if (!API_BASE) {
