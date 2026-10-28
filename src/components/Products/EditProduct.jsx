@@ -781,12 +781,28 @@ if (
 
   // Delete Files from Storage
   const deleteFilesFromStorage = async () => {
-    const imageIds = imagesToDelete.map(getMongoImageId).filter(Boolean);
-    await Promise.all(imageIds.map(deleteImageFromMongoDB));
+    try {
+      const imageIds = imagesToDelete.map(getMongoImageId).filter(Boolean);
+      await Promise.all(
+        imageIds.map(async (id) => {
+          try {
+            await deleteImageFromMongoDB(id);
+          } catch (err) {
+            console.warn(`Failed to delete MongoDB image ${id}:`, err);
+          }
+        })
+      );
 
-    if (videoToDelete && videoToDelete.trim() !== '') {
-      const videoRef = ref(storage, videoToDelete);
-      await deleteObject(videoRef);
+      if (videoToDelete && videoToDelete.trim() !== '') {
+        try {
+          const videoRef = ref(storage, videoToDelete);
+          await deleteObject(videoRef);
+        } catch (videoErr) {
+          console.warn(`Failed to delete old video from storage:`, videoErr);
+        }
+      }
+    } catch (err) {
+      console.warn("deleteFilesFromStorage encountered an error:", err);
     }
   };
 
