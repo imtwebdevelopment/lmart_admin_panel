@@ -594,11 +594,16 @@ const AddProductPage = () => {
 
       // C. Video Upload
       if (videoFile) {
-        const file = videoFile.file;
-        const fileName = `products/${Date.now()}_video_${file.name}`;
-        const storageRef = ref(storage, fileName);
-        await uploadBytes(storageRef, file);
-        videoDownloadURL = await getDownloadURL(storageRef);
+        try {
+          const file = videoFile.file;
+          const fileName = `products/${Date.now()}_video_${file.name}`;
+          const storageRef = ref(storage, fileName);
+          await uploadBytes(storageRef, file);
+          videoDownloadURL = await getDownloadURL(storageRef);
+        } catch (videoErr) {
+          console.warn("Video upload to Firebase Storage failed (quota or network):", videoErr);
+          videoDownloadURL = '';
+        }
       }
 
       // --- 4. PREPARE DATA FOR FIRESTORE ---

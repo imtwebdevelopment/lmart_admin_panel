@@ -793,7 +793,36 @@ if (
         })
       );
 
-      if (videoToDelete && videoToDelete.trim() !== '') {
+      // Legacy fallback: If any images in imagesToDelete are old Firebase Storage paths (not MongoDB IDs)
+      const legacyFirebaseImages = imagesToDelete.filter(item => {
+        if (!item || typeof item !== 'string') return false;
+        const trimmed = item.trim();
+        return !getMongoImageId(trimmed) &&
+               !trimmed.startsWith('mongodb://') &&
+               !trimmed.includes('/api/images/') &&
+               (trimmed.startsWith('products/') || trimmed.startsWith('gs://') || trimmed.includes('firebasestorage.googleapis.com'));
+      });
+
+      await Promise.all(
+        legacyFirebaseImages.map(async (fbItem) => {
+          try {
+            const fbRef = ref(storage, fbItem);
+            await deleteObject(fbRef);
+          } catch (fbErr) {
+            console.warn(`Legacy Firebase image delete skipped/failed:`, fbErr);
+          }
+        })
+      );
+
+      // Safely delete video if it is a genuine Firebase Storage path
+      if (
+        videoToDelete &&
+        typeof videoToDelete === 'string' &&
+        videoToDelete.trim() !== '' &&
+        !videoToDelete.startsWith('mongodb://') &&
+        !videoToDelete.includes('/api/images/') &&
+        !/^[0-9a-fA-F]{24}$/.test(videoToDelete.trim())
+      ) {
         try {
           const videoRef = ref(storage, videoToDelete);
           await deleteObject(videoRef);
@@ -823,8 +852,8 @@ if (
       size: file.size
     };
   } catch (error) {
-    console.error("Error uploading file:", error);
-    throw error;
+    console.warn("Error uploading file to Firebase Storage (quota or network):", error);
+    return null;
   }
 };
 
@@ -913,7 +942,7 @@ if (
       // 4. Handle Video
       if (videoFile) {
         const videoResult = await uploadFileToFirebase(videoFile.file, 'product-videos', 'video');
-        videoDownloadURL = videoResult.url;
+        videoDownloadURL = videoResult ? videoResult.url : null;
       } else if (productData.existingVideo && 
                 !videoToDelete && 
                 productData.existingVideo.url) {
