@@ -781,38 +781,8 @@ if (
 
   // Delete Files from Storage
   const deleteFilesFromStorage = async () => {
-    try {
-      const imageIds = imagesToDelete.map(getMongoImageId).filter(Boolean);
-      await Promise.all(
-        imageIds.map(async (id) => {
-          try {
-            await deleteImageFromMongoDB(id);
-          } catch (err) {
-            console.warn(`Failed to delete MongoDB image ${id}:`, err);
-          }
-        })
-      );
-
-      // Legacy fallback: If any images in imagesToDelete are old Firebase Storage paths (not MongoDB IDs)
-      const legacyFirebaseImages = imagesToDelete.filter(item => {
-        if (!item || typeof item !== 'string') return false;
-        const trimmed = item.trim();
-        return !getMongoImageId(trimmed) &&
-               !trimmed.startsWith('mongodb://') &&
-               !trimmed.includes('/api/images/') &&
-               (trimmed.startsWith('products/') || trimmed.startsWith('gs://') || trimmed.includes('firebasestorage.googleapis.com'));
-      });
-
-      await Promise.all(
-        legacyFirebaseImages.map(async (fbItem) => {
-          try {
-            const fbRef = ref(storage, fbItem);
-            await deleteObject(fbRef);
-          } catch (fbErr) {
-            console.warn(`Legacy Firebase image delete skipped/failed:`, fbErr);
-          }
-        })
-      );
+    const imageIds = [...new Set(imagesToDelete.map(getMongoImageId).filter(Boolean))];
+    await Promise.all(imageIds.map((id) => deleteImageFromMongoDB(id)));
 
       // Safely delete video if it is a genuine Firebase Storage path
       if (
@@ -830,9 +800,6 @@ if (
           console.warn(`Failed to delete old video from storage:`, videoErr);
         }
       }
-    } catch (err) {
-      console.warn("deleteFilesFromStorage encountered an error:", err);
-    }
   };
 
  const uploadFileToFirebase = async (file, folder, customName) => {

@@ -38,6 +38,7 @@ import {
 import { db } from "../../firebase";
 
 import { FALLBACK_IMAGE, getAdminProductImage, handleImageError, resolveImageUrl } from "../../utils/imageUtils";
+import { deleteMongoImagesForProduct } from "../../services/imageService";
 
 // ==========================================================
 // UTILITY FUNCTIONS (Unchanged)
@@ -371,6 +372,9 @@ const handleToggleTrending = async (product) => {
       deletedAt: serverTimestamp(),
       deletedBy: "admin", // optional
     });
+
+    // Remove image documents before deleting the product reference.
+    await deleteMongoImagesForProduct(product);
 
     // 2️⃣ Remove product from products collection
     await deleteDoc(doc(db, "products", product.id));

@@ -44,7 +44,7 @@ export const uploadImageToMongoDB = async (file, { productId = '', associatedRec
     id: result.id,
     name: result.originalName || file.name,
     contentType: result.contentType,
-    path: `mongodb://${result.id}`,
+    path: getStableImageUrl(result.id),
     type: 'mongodb',
     isMain: result.isMain,
     color: result.color,
@@ -85,7 +85,7 @@ export const replaceImageInMongoDB = async (imageId, file, { productId = '', ass
     id: result.id,
     name: result.originalName || file.name,
     contentType: result.contentType,
-    path: `mongodb://${result.id}`,
+    path: getStableImageUrl(result.id),
     type: 'mongodb',
     isMain: result.isMain,
     color: result.color,
@@ -125,10 +125,38 @@ export const deleteMongoImageReference = async (imageReference) => {
   return null;
 };
 
+export const deleteMongoImagesForProduct = async (product) => {
+  const references = [
+    product?.mainImageUrl,
+    ...(Array.isArray(product?.imageUrls) ? product.imageUrls : []),
+  ];
+  if (product?.id) {
+    const response = await fetch(`${getApiBase()}/images/product/${encodeURIComponent(product.id)}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to list product images (${response.status})`);
+    }
+    const result = await response.json();
+    references.push(...(Array.isArray(result.images) ? result.images : []));
+  }
+  const imageIds = [...new Set(
+    references
+      .map((image) => {
+        if (typeof image === 'string') return getMongoImageId(image);
+        return getMongoImageId(image?.id || image?.url || image?.path);
+      })
+      .filter(Boolean)
+  )];
+
+  await Promise.all(imageIds.map((imageId) => deleteImageFromMongoDB(imageId)));
+  return imageIds.length;
+};
+
 export default {
   uploadImageToMongoDB,
   replaceImageInMongoDB,
   deleteImageFromMongoDB,
   getMongoImageId,
   deleteMongoImageReference,
+  deleteMongoImagesForProduct,
 };
